@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints
+lightning_logs/
+
+# Temp files
+.DS_Store
+*~
+buck-out/
+
+# Compiled files
+.venv/
+.mypy_cache/
+.ruff_cache/
+
+# Distribution / packaging
+/build/
+/dist/
+/*.egg-info/
+
+# Tests and coverage
+/.pytest_cache/
+/.cache/
+/data/
+/node_modules/
+tmp/
+
+# docs
+/docs/**/generated/
+/docs/_build/
+
+# IDEs
+/.idea/
+/.vscode/
