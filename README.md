@@ -1,3 +1,8 @@
+---
+orphan: true
+---
+
+
 # DRVI tutorials
 
 This repository hosts all official tutorials for [DRVI](https://github.com/theislab/DRVI/).
