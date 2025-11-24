@@ -119,8 +119,6 @@ DRVI.setup_anndata(
 # construct the model
 model = DRVI(
     adata,
-    # Provide categorical covariates keys once again. Refer to advanced usages for more options.
-    categorical_covariates=["batch"],
     n_latent=128,
     # For encoder and decoder dims, provide a list of integers.
     encoder_dims=[128, 128],
