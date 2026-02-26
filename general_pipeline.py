@@ -81,7 +81,7 @@ plt.rcParams["figure.figsize"] = (3, 3)
 # ## Config
 
 # +
-# Set this to false if you already trained your model and do not like to retrain.
+# Set this to false if you already trained your model and do not want to retrain.
 overwrite = False
 SEED = 1  # Set to None if you don't want to set seed
 
@@ -92,21 +92,26 @@ io_dir.mkdir(parents=True, exist_ok=True)
 io_dir
 # -
 
-# ## Load Data
+# ## Download data
 
-# + magic_args="-s \"$io_dir\"" language="bash"
-# export io_dir=$1
+input_anndata_path = io_dir.parent / "immune_all.h5ad"
+input_anndata_path
+
+# + magic_args="-s \"$input_anndata_path\"" language="bash"
+# export input_anndata_path=$1
 #
 # # Download Example Immune dataset if it does not exist
-# if [ ! -f $io_dir/immune_all.h5ad ]; then
-#   curl -L https://figshare.com/ndownloader/files/25717328 -o $io_dir/immune_all.h5ad
+# if [ ! -f $input_anndata_path ]; then
+#   curl -L https://figshare.com/ndownloader/files/25717328 -o $input_anndata_path
 #   echo "File downloaded successfully."
 # else
 #   echo "File already exists."
 # fi
 # -
 
-adata = sc.read_h5ad(io_dir / "immune_all.h5ad")
+# ## Load Data
+
+adata = sc.read_h5ad(input_anndata_path)
 # Remove dataset with non-count values
 adata = adata[adata.obs["batch"] != "Villani"].copy()
 # We shuffle the data for better visualization. Otherwise order of points in UMAP will not be random.
@@ -134,7 +139,7 @@ adata
 sc.pl.umap(adata, color=["batch", "final_annotation"], ncols=1, frameon=False)
 
 
-# Save pre-processes data for next notebooks
+# Save pre-processed data for next notebooks
 if overwrite or not (io_dir / "adata_preprocesses.h5ad").exists():
     adata.write_h5ad(io_dir / "adata_preprocesses.h5ad")
 
@@ -149,8 +154,8 @@ DRVI.setup_anndata(
     # DRVI accepts count data by default.
     # Do not forget to change gene_likelihood if you provide a non-count data.
     layer="counts",
-    # Always provide a list. DRVI can accept multiple covariates.
-    categorical_covariate_keys=["batch"],
+    batch_key="batch",
+    # In addition to batch_key, you can also provide additional `categorical_covariate_keys`.
     # DRVI accepts count data by default.
     # Set to false if you provide log-normalized data and use normal distribution (mse loss).
     is_count_data=True,
@@ -166,6 +171,9 @@ model = DRVI(
     # For encoder and decoder dims, provide a list of integers.
     encoder_dims=[128, 128],
     decoder_dims=[128, 128],
+    # depending on the variability of gene dispersions use 'gene' (default) or 'gene-batch'
+    # dispersion='gene',
+    # dispersion='gene-batch',
 )
 model
 
@@ -222,13 +230,23 @@ embed_path = io_dir / "embed.h5ad"
 if overwrite or not embed_path.exists():
     embed = ad.AnnData(model.get_latent_representation(), obs=adata.obs)
 
-    # We set latent dimension stats here (see drvi.utils.pl.plot_latent_dimension_stats in next cells)
-    drvi.utils.tl.set_latent_dimension_stats(model, embed, vanished_threshold=0.1)
+    # We set latent dimension stats here (see docs for more info)
+    print("Setting latent dimension stats ...")
+    model.set_latent_dimension_stats(embed, vanished_threshold=0.5)
     
+    # We immediately calculate the interpretability gene scores with different approaches
+    print("Calculating gene scores per factor ...")
+    # out-of-distribution (OOD) approach uses decoder reconstructions to calculate gene scores (faster)
+    model.calculate_interpretability_scores(embed, "OOD")
+    # within-distribution (IND) approach iterates over all cells and calculates gene scores
+    model.calculate_interpretability_scores(embed, "IND")
+
+    print("Dimension reduction ...")
     sc.pp.neighbors(embed, n_neighbors=10, use_rep="X", n_pcs=embed.X.shape[1])
     sc.tl.umap(embed, spread=1.0, min_dist=0.5, random_state=123)
     sc.pp.pca(embed)
-    
+
+    print("Writing ...")
     embed.write_h5ad(embed_path)
 # -
 
@@ -237,9 +255,9 @@ embed = sc.read_h5ad(embed_path)
 sc.pl.umap(embed, color=["batch", "final_annotation"], ncols=1, frameon=False)
 
 
-# ### Chack latent dimension stats
+# ### Check latent dimension stats
 
-# Show information for latnet factors
+# Show information for latent factors
 embed.var.sort_values("reconstruction_effect", ascending=False)[:5]
 
 drvi.utils.pl.plot_latent_dimension_stats(embed, ncols=2)
@@ -264,79 +282,78 @@ drvi.utils.pl.plot_latent_dims_in_umap(embed)
 
 drvi.utils.pl.plot_latent_dims_in_heatmap(embed, "final_annotation", title_col="title")
 
-# It is possible to sort dimensions based on the top relevance with respect to a categoricals variable
+# It is possible to sort dimensions based on the top relevance with respect to a categorical variable
 
 drvi.utils.pl.plot_latent_dims_in_heatmap(embed, "final_annotation", title_col="title", sort_by_categorical=True)
 
 
 # ## Interpretability
 
-# ### Traversing the latent space
+#  The scores are already calculated and stored in embed.varm.
 
-# Here we use DRVI's utils to traverse latent space and find the effect of each latent dimension
+embed.varm
+
+# ### Out-Of-Distribution (OOD) scores
+#
+# This approach iterates over latent dimensions and calculates decoder effects.
+
+# We first visualize gene scores based on default algorithm (optionally you can pass `key="OOD_combined"`)
+#
+# These scores show a combination of max effect and specificity. So, this is our suggested method to consider for finding cell-types and most specific genes of a program.
+#
+# If human readable gene symbols are present in a different column of adata other than adata.var.index, please pass that column as `gene_symbols=...` to the function.
+
+model.plot_interpretability_scores(embed, adata)
+
+# You can get all scores as a dataframe:
+
+# Note: Genes (rows of the dataframe) appear as in adata and are not sorted.
+scores_df = model.get_interpretability_scores(embed, adata)
+scores_df.iloc[:10, :10]
+
+# A user can take a deeper look into individual dimensions. By visualizing the min_possible, and max_possible log-fold-changes of each dimension in OOD settings. Please refer to paper appendix for details on these scores that together form OOD_combined.
+#
+# ```
+# scores_df = model.get_interpretability_scores(embed, adata, key="OOD_max_possible")
+# scores_df = model.get_interpretability_scores(embed, adata, key="OOD_min_possible")
+# ```
+#
+# or for visualization:
+# ```
+# model.plot_interpretability_scores(embed, adata, key="OOD_max_possible")
+# model.plot_interpretability_scores(embed, adata, key="OOD_max_possible")
+# ```
+
+# ---
+# Users can plot top relevant genes of a factor on UMAP using scanpy plotting functions:
 
 # +
-traverse_adata_path = io_dir / "traverse_adata.h5ad"
+# DR 11- shows CD8+ cells and DR 27+ shows T-reg
 
-if overwrite or not traverse_adata_path.exists():
-    traverse_adata = drvi.utils.tl.traverse_latent(model, embed, n_samples=20, max_noise_std=0.0)
-    drvi.utils.tl.calculate_differential_vars(traverse_adata)
-    traverse_adata.write_h5ad(traverse_adata_path)
-# -
+# We first copy UMAP embeddings to original anndata
+adata.obsm['X_drvi_umap'] = embed[adata.obs.index].obsm['X_umap']
 
-traverse_adata = sc.read_h5ad(traverse_adata_path)
-traverse_adata
-
-# ### Getting the results
-
-# We can then visualize the top relevant genes for each dimension
-
-drvi.utils.pl.show_top_differential_vars(traverse_adata, key="combined_score", score_threshold=0.0)
-
-
-
-
-# +
-dimensions_interpretability = drvi.utils.tools.iterate_on_top_differential_vars(
-    traverse_adata, key="combined_score", score_threshold=0.0
-)
-
-# For making it brief we just iterate over 5 dimensions
-for dim_title, gene_scores in dimensions_interpretability[:5]:
+# Show top 4 genes related to these two dimensions
+for dim_title in ['DR 11-', 'DR 27+']:
     print(dim_title)
-    # We just print top 20
-    print(gene_scores[:20])
+    top_genes = scores_df[dim_title].sort_values(ascending=False).index.to_list()[:4]
+    drvi.utils.pl.plot_latent_dims_in_umap(embed, dim_subset=[dim_title], directional=True)
+    sc.pl.embedding(adata, "X_drvi_umap", color=top_genes)
 # -
 
-# ### Looking into individual dimensions
+# ### Within-Distribution (IND) scores
+#
+# This approach iterates over all cells in anndata and averages the effect of each latent factor on each gene. The scores are already stored in embed.
 
-# A user can take a deeper look into individual dimensions. we can see the min_possible, and max_possible log-fold-changes of each dimension. In addition, one can check the activity of top relevant genes for dimensions of interest.
+# These scores reflect the broad mechanistic effect of each latent dimension. Because genes are not filtered for uniqueness, shared genes retain high scores, providing a complete view of how each factor influences the genetic landscape.
 
-# We visualize 3 dimensions:
-# 1. DR 13- highlighting CD8
-# 2. DR 35+ highlighting Technical stress response
-# 3. DR 28- highlighting T-reg cells
-drvi.utils.pl.show_differential_vars_scatter_plot(
-    traverse_adata,
-    key_x="max_possible",
-    key_y="min_possible",
-    key_combined="combined_score",
-    dim_subset=["DR 11-", "DR 30+", "DR 40+"],
-    score_threshold=0.0,
-)
+model.plot_interpretability_scores(embed, adata, key="IND_linear_weighted_mean")
 
+# You can get all scores as a dataframe:
 
-for fig in drvi.utils.pl.plot_relevant_genes_on_umap(
-    adata,
-    embed,
-    traverse_adata,
-    traverse_adata_key="combined_score",
-    dim_subset=["DR 11-", "DR 30+", "DR 40+"],
-    score_threshold=0.0,
-):
-    plt.show()
-
-
+# Note: Genes (rows of the dataframe) appear as in adata and are not sorted.
+scores_df = model.get_interpretability_scores(embed, adata, key="IND_linear_weighted_mean")
+scores_df.iloc[:10, :10]
 
 # ## Identification of programs
 
@@ -347,7 +364,7 @@ for fig in drvi.utils.pl.plot_relevant_genes_on_umap(
 # - scientific literature
 # - automated tools based on language models
 #
-# **Please refer to this tutorial for some tools that we found useful for identification of programs**
+# <!-- **Please refer to this tutorial for some tools that we found useful for identification of programs** -->
 #
 # It is worth mentioning that since such supervised information is not given to the model, the quality of the derived signatures is neither affected nor biased by it. Unidentified processes with high gene scores are promising candidates for further literature search, additional analysis, and even experimental design.
 
