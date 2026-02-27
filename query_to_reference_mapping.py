@@ -21,6 +21,8 @@
 # - Query to reference mapping
 # - Observe the integrated latent space in UMAP
 # - Observe transferred factors
+#
+# **IMPORTANT:** Set `encode_covariates=True` when initializing the model (not default). This ensures the model uses batch information in the encoder, which is essential for query to reference mapping.
 
 # ## Contact
 
