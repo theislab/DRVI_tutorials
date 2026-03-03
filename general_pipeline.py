@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.18.1
+#       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: python_apptainer
 #     language: python
@@ -43,9 +43,9 @@ branch = "latest"
 IN_COLAB = "google.colab" in sys.modules
 
 if IN_COLAB and branch == "stable":
-    # !pip install multigrate[tutorials]
+    # !pip install drvi-py[tutorials]
 elif IN_COLAB and branch != "stable":
-    # !pip install git+https://github.com/theislab/drvi.git#egg=drvi[tutorials]
+    # !pip install git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]
 # -
 
 # ## Imports
@@ -97,16 +97,21 @@ io_dir
 input_anndata_path = io_dir.parent / "immune_all.h5ad"
 input_anndata_path
 
-# + magic_args="-s \"$input_anndata_path\"" language="bash"
-# export input_anndata_path=$1
-#
-# # Download Example Immune dataset if it does not exist
-# if [ ! -f $input_anndata_path ]; then
-#   curl -L https://figshare.com/ndownloader/files/25717328 -o $input_anndata_path
-#   echo "File downloaded successfully."
-# else
-#   echo "File already exists."
-# fi
+# +
+# Run this cell only if you need to download the data
+import requests
+
+url = f"https://api.figshare.com/v2/file/download/25717328"
+
+if input_anndata_path.exists():
+    print("File already exists.")
+else:
+    print("Downloading ...")
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        with open(input_anndata_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024*1024): f.write(chunk)
+    print(f"Successfully downloaded: {input_anndata_path}")
 # -
 
 # ## Load Data
@@ -328,7 +333,7 @@ scores_df.iloc[:10, :10]
 # Users can plot top relevant genes of a factor on UMAP using scanpy plotting functions:
 
 # +
-# DR 11- shows CD8+ cells and DR 27+ shows T-reg
+# DR 11- shows CD8+ cells and DR 27+ shows T-reg (May vary depending on the system and initialization)
 
 # We first copy UMAP embeddings to original anndata
 adata.obsm['X_drvi_umap'] = embed[adata.obs.index].obsm['X_umap']
