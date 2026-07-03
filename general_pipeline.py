@@ -326,7 +326,7 @@ scores_df.iloc[:10, :10]
 # or for visualization:
 # ```
 # model.plot_interpretability_scores(embed, adata, key="OOD_max_possible")
-# model.plot_interpretability_scores(embed, adata, key="OOD_max_possible")
+# model.plot_interpretability_scores(embed, adata, key="OOD_min_possible")
 # ```
 
 # ---
