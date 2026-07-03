@@ -33,3 +33,9 @@ tmp/
 # IDEs
 /.idea/
 /.vscode/
+
+## Single-cell data files (very large)
+*.h5ad
+*.h5
+*.loom
+*.pkl
