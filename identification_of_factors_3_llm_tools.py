@@ -35,11 +35,11 @@
 # > exact versions that conflict with a modern single-cell stack. The **Direct LLM** section below
 # > replaces it with a stronger, transparent prompt you can adapt — so we just mention it here.
 #
-# > This is one of three companion notebooks. See
-# > [cell types from annotations](./identification_of_factors_1_cell_types.html) and
-# > [biological processes via enrichment](./identification_of_factors_2_biological_processes.html).
-# > All three share `embed.h5ad`; the curation view lives in the biological-processes notebook and
-# > will pick up the results stored here.
+# > This is one of four companion notebooks. See
+# > [cell types from annotations](./identification_of_factors_1_cell_types.html),
+# > [biological processes via enrichment](./identification_of_factors_2_biological_processes.html),
+# > and [factor curation](./identification_of_factors_4_curation.html).
+# > All share `embed.h5ad`; the curation notebook picks up the results stored here.
 #
 # > **⚠️ This notebook is not executed in CI, and its dependencies are intentionally left out of
 # > `requirements.txt`.** LLM output is fluent but produced *without an uncertainty signal* and can

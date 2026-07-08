@@ -33,9 +33,10 @@
 #
 # Both sections share the same SMI machinery, defined once as helper functions.
 #
-# > This is one of three companion notebooks that identify DRVI factors. The others cover
-# > [biological processes via enrichment](./identification_of_factors_2_biological_processes.html)
-# > and [LLM-based tools](./identification_of_factors_3_llm_tools.html). They all read and write
+# > This is one of four companion notebooks that identify DRVI factors. The others cover
+# > [biological processes via enrichment](./identification_of_factors_2_biological_processes.html),
+# > [LLM-based tools](./identification_of_factors_3_llm_tools.html), and
+# > [factor curation](./identification_of_factors_4_curation.html). They all read and write
 # > the same `embed.h5ad`, so results accumulate.
 #
 # **We always advise examination by a biologist and validation against published literature.**
