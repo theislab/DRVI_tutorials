@@ -174,7 +174,7 @@ ind_scores = model.get_interpretability_scores(embed, adata, key=score_key_ind)
 LLM_BACKEND = "claude_code"  # one of: "ollama", "claude", "claude_code", "openai", "gemini"
 
 # Ollama (OpenAI-compatible; no API key needed)
-OLLAMA_URL   = "http://supergpu22.scidom.de:8979"  # replace with your node and port
+OLLAMA_URL   = "http://127.0.0.1:11434"  # replace with your node and port
 OLLAMA_MODEL = "qwen3.6:35b"
 
 # Claude via the Anthropic API SDK — reads ANTHROPIC_API_KEY from the environment
