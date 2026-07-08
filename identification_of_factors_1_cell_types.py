@@ -13,26 +13,30 @@
 #     name: python3
 # ---
 
+
 # %% [markdown]
 # # Identifying cell types of DRVI factors
 #
-# Some DRVI latent factors capture **cell-type identity**. This notebook links factors to
-# known cell types by measuring how well each factor-direction aligns with a categorical
-# annotation, using **Scaled Mutual Information (SMI)** (normalized to [0, 1]; 1 = perfect
-# one-to-one correspondence).
-#
-# We cover two sources of cell-type labels:
+# Some DRVI latent factors capture **cell-type identity**. When cell-type annotations are
+# available, we can use them to identify such factors — by measuring how well each factor's
+# direction aligns with a categorical annotation, using **Scaled Mutual Information (SMI)**
+# (normalized to [0, 1]; 1 = perfect one-to-one correspondence). The annotations can come from:
 #
 # 1. **User annotations** — labels already present in `adata.obs` (Section 1).
-# 2. **A pre-trained classifier** — [CellTypist](https://www.celltypist.org/), when you have no
-#    labels or want finer subtypes (Section 2).
+# 2. **Predictions from a pre-trained model** — if you have no annotations (or want finer
+#    subtypes), borrow labels from a model already trained on annotated atlases (Section 2).
+#
+# Importantly, this supervised information is never given to DRVI during training, so the factors
+# themselves are **not biased** by it — the annotations only help us label the factors after
+# training. Any assignment made here can later be independently verified using each factor's
+# top-scoring genes.
 #
 # Both sections share the same SMI machinery, defined once as helper functions.
 #
 # > This is one of three companion notebooks that identify DRVI factors. The others cover
 # > [biological processes via enrichment](./identification_of_factors_2_biological_processes.html)
 # > and [LLM-based tools](./identification_of_factors_3_llm_tools.html). They all read and write
-# > the same `embed.h5ad`, so results accumulate — run this one first.
+# > the same `embed.h5ad`, so results accumulate.
 #
 # **We always advise examination by a biologist and validation against published literature.**
 
@@ -48,8 +52,9 @@
 # - Point `io_dir` at your project directory (holding `adata_preprocesses.h5ad`,
 #   `drvi_model/`, `embed.h5ad`).
 # - **Section 1**: set `annot_col` to the `adata.obs` column with your cell-type labels.
-# - **Section 2**: set `ct_model` to a CellTypist model matching your tissue/species
-#   (e.g. `"Immune_All_Low.pkl"` for PBMC, `"Developing_Mouse_Brain.pkl"` for mouse brain).
+# - **Section 2**: to use CellTypist as the pre-trained model, set `ct_model` to a CellTypist
+#   model matching your tissue/species (e.g. `"Immune_All_Low.pkl"` for PBMC,
+#   `"Developing_Mouse_Brain.pkl"` for mouse brain).
 
 # %% [markdown]
 # ## Contact
@@ -87,7 +92,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # %%
-import numpy as np
 import pandas as pd
 import scanpy as sc
 import matplotlib.pyplot as plt
@@ -155,7 +159,6 @@ def build_directional_df(embed):
     embed_neg.X = -embed_neg.X.clip(max=0)
     return pd.concat([embed_pos.to_df(), embed_neg.to_df()], axis=1).loc[embed.obs.index]
 
-
 # %%
 def smi_matches(embed_directional_df, target, threshold):
     """SMI between every factor-direction and every category of `target`.
@@ -181,7 +184,6 @@ def smi_matches(embed_directional_df, target, threshold):
         .sort_values("value", ascending=False)
     )
     return smi, top
-
 
 # %%
 def plot_packed_network(df, title_col="title", var_col="variable", val_col="value", figsize=(14, 10)):
@@ -212,7 +214,6 @@ def plot_packed_network(df, title_col="title", var_col="variable", val_col="valu
     plt.axis("off")
     plt.show()
 
-
 # %%
 def store_matches(embed, top, suffix):
     """Store the best match per factor-direction in `embed.var` and the full table in `embed.uns`.
@@ -235,7 +236,6 @@ def store_matches(embed, top, suffix):
 
     embed.uns[f"best_smi_matching_{suffix}_results"] = top
 
-
 # %% [markdown]
 # ## 1. Cell types from user annotations
 #
@@ -244,7 +244,7 @@ def store_matches(embed, top, suffix):
 # labels (subtypes, developmental stages, shared processes), so most factors will not match a
 # label, and that is expected: the other notebooks characterize the rest.
 #
-# **Skip this section if your dataset has no cell-type annotations** and start from Section 2.
+# **Skip this section if your dataset has no cell-type annotations** and instead follow Section 2.
 
 # %% [markdown]
 # ### Config
@@ -293,18 +293,19 @@ store_matches(embed, smi_top_matches, suffix="user_annotations")
 )
 
 # %% [markdown]
-# **How to read this.** Each row is a factor-direction confidently mapped to an annotated cell
-# type (e.g. in the immune atlas, a plasmacytoid-DC factor, a CD16+ monocyte factor, a plasma-cell
-# factor). These matched factors both confirm the model learned meaningful axes and serve as a
-# reference set to sanity-check the other tools against. Unmatched factors are the ones the
-# remaining notebooks aim to characterize.
+# **How to read this.** Each row is a factor-direction mapped to an annotated cell type (e.g. in
+# the immune atlas, a plasmacytoid-DC factor, a CD16+ monocyte factor, a plasma-cell factor).
+# These matches let us label factors with the cell types we already recognize in the data.
+# Unmatched factors are the ones the remaining notebooks aim to characterize.
 
 # %% [markdown]
-# ## 2. Cell types from a pre-trained classifier (CellTypist)
+# ## 2. Cell types from a pre-trained model
 #
-# [CellTypist](https://www.celltypist.org/) is a logistic-regression classifier trained on large
-# annotated atlases. We run it on the data, then compute SMI between the CellTypist labels and the
-# DRVI factors — reusing exactly the helpers from Section 1.
+# When you have no manual labels (or want finer subtypes), you can borrow labels from any model
+# already trained on annotated atlases. **In this example we use
+# [CellTypist](https://www.celltypist.org/)**, a logistic-regression classifier — but any
+# annotation source plugs in the same way. We run it on the data, then compute SMI between its
+# labels and the DRVI factors, reusing exactly the helpers from Section 1.
 #
 # Useful when you have **no manual labels**, or want **finer subtypes** than your labels provide.
 # **Skip it if your annotations are already sufficient.**
@@ -380,11 +381,11 @@ store_matches(embed, smi_top_matches, suffix="celltypist")
 )
 
 # %% [markdown]
-# **How to read this.** A tissue-matched classifier can extend or replace manual labels: it may
-# resolve finer subtypes (e.g. naive vs. memory B cells, classical vs. non-classical monocytes)
-# and can annotate factors that had no prior label. Cross-check its calls against the user
-# annotations from Section 1 where both exist — agreement between the two is reassuring, and
-# disagreement flags factors worth a closer look.
+# **How to read this.** A classifier can extend or replace manual labels: it may resolve finer
+# subtypes (e.g. naive vs. memory B cells, classical vs. non-classical monocytes) and can annotate
+# factors that had no prior label. We suggest verifying these assignments against each factor's
+# top-scoring genes. Note that, because DRVI is trained independently, errors from these
+# classifiers do not leak into the DRVI factors.
 
 # %% [markdown]
 # ## 3. Save
