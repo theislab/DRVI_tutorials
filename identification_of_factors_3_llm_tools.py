@@ -17,10 +17,10 @@
 # # Identifying DRVI factors with LLM tools
 #
 # LLM-based annotators take a factor's top marker genes and return a cell-type or
-# biological-process label in natural language. They need **no reference atlas and no
-# significance threshold**, so they can label factors the annotation- and enrichment-based tools
-# leave empty — which makes them useful **when neither user annotations nor a tissue-matched
-# CellTypist model are available**. This notebook covers:
+# biological-process label in natural language without requiring a reference atlas.
+# In practice, they can label factors the annotation- and enrichment-based tools
+# leave empty — which makes them useful when neither of the previous steps identifies a factor.
+# This notebook covers:
 #
 # 1. **Direct LLM annotation** — a single, well-structured prompt you control, runnable against any
 #    backend (**Ollama**, **Claude API**, **Claude Code** (no API key), **OpenAI**, or **Gemini**).
@@ -29,22 +29,17 @@
 #    with a quality score.
 # 3. **gs2txt** — free-text process summaries that run pathway enrichment first, then one LLM call.
 #
-# > **Why no AnnDictionary?** We previously included [AnnDictionary](https://github.com/ggit12/anndictionary).
-# > Its `ai_cell_type` / `ai_biological_process` are a single hardcoded one-line, zero-shot prompt
-# > (no reasoning, no validation), and the package pins `numpy`, `scanpy`, and `anndata` to old
-# > exact versions that conflict with a modern single-cell stack. The **Direct LLM** section below
-# > replaces it with a stronger, transparent prompt you can adapt — so we just mention it here.
-#
 # > This is one of four companion notebooks. See
 # > [cell types from annotations](./identification_of_factors_1_cell_types.html),
 # > [biological processes via enrichment](./identification_of_factors_2_biological_processes.html),
 # > and [factor curation](./identification_of_factors_4_curation.html).
 # > All share `embed.h5ad`; the curation notebook picks up the results stored here.
 #
-# > **⚠️ This notebook is not executed in CI, and its dependencies are intentionally left out of
-# > `requirements.txt`.** LLM output is fluent but produced *without an uncertainty signal* and can
+# > **Note:** LLM output is fluent but produced *without an uncertainty signal* and can
 # > be confidently wrong, so always cross-check it against the SMI and enrichment tools and against
-# > the literature. Install the packages for your chosen backend via the install cell below.
+# > the literature.
+#
+# Install the packages for your chosen backend via the install cell below.
 
 # %% [markdown]
 # ## Prerequisites
@@ -101,8 +96,6 @@ import asyncio
 import pandas as pd
 from pathlib import Path
 
-import scvi
-import drvi
 from drvi.model import DRVI
 import scanpy as sc
 
@@ -137,7 +130,7 @@ llm_species = "human"  # or "mouse"
 # How many informative factor-directions to annotate. Set to an int for a quick/cheap smoke test
 # (annotates the first N); None = annotate all. Applies to every section below.
 # NOTE: the example outputs saved in this notebook were produced with the 8-direction sample below.
-max_directions = 8
+max_directions = None
 
 # %% [markdown]
 # ### Load model and embeddings
@@ -195,32 +188,6 @@ OPENAI_MODEL = "gpt-4o"
 
 # Gemini (google-genai) — reads GEMINI_API_KEY / GOOGLE_API_KEY from the environment
 GEMINI_MODEL = "gemini-2.5-flash"
-
-# %% [markdown]
-# ### Ollama setup guide (only if `LLM_BACKEND = "ollama"`)
-#
-# [Ollama](https://ollama.com/) runs open LLMs (Llama 3, Qwen, ...) locally or on a cluster.
-#
-# **0. Install** (one-time; clusters usually disallow Docker, so use Apptainer):
-# ```bash
-# mkdir -p ~/containers
-# apptainer pull ~/containers/ollama.sif docker://ollama/ollama:latest
-# ```
-# **1. Start a GPU job** via your scheduler (e.g. Slurm).
-# **2. Launch the container** (adjust bind paths):
-# ```bash
-# apptainer shell --nv --bind /localscratch --bind /lustre/groups/ml01/ ~/containers/ollama.sif
-# ```
-# **3. Start the server** on a custom port:
-# ```bash
-# OLLAMA_HOST=0.0.0.0:8979 ollama serve &
-# ```
-# **4. Pull a model**:
-# ```bash
-# export OLLAMA_HOST=supergpu22.scidom.de/:8979
-# ollama pull qwen3.6:35b
-# ```
-# Update `OLLAMA_URL` / `OLLAMA_MODEL` above to match.
 
 # %% [markdown]
 # ### The backend dispatcher
@@ -420,12 +387,12 @@ embed.var.index = embed.var["original_dim_id"].astype(int).astype(str)
 embed.var.index.name = None
 
 # %% [markdown]
-# **How to read this.** This runs on every factor, so it can give coarse orientation where SMI is
-# empty; when the gene list points clearly at one lineage, `cell_type` and `biological_process`
+# **How to read this.** This runs on every factor.
+# When the gene list points clearly at one lineage, `cell_type` and `biological_process`
 # tend to agree and `confidence` is `"high"`. Because the output is fluent and self-reported, treat
-# `"low"`/`"medium"` confidence calls with caution and always cross-check against the SMI and
-# enrichment tools. The `key_genes` and `reasoning` fields let you trace each call back to the
-# factor's marker list.
+# `"low"`/`"medium"` confidence calls with caution and always cross-check against the SMI,
+# enrichment tools, and the literature.
+# The `key_genes` and `reasoning` fields let you trace each call back to the factor's marker list.
 
 # %% [markdown]
 # ## 2. CASSIA
@@ -506,9 +473,10 @@ embed.var.index = embed.var["original_dim_id"].astype(int).astype(str)
 embed.var.index.name = None
 
 # %% [markdown]
-# **How to read this.** The general + detailed tiers carry more information than a single label and
-# often reinforce each other on strong-signal factors; the general tier tends to be the more
-# reliable of the two. Treat it as coarse orientation and cross-check.
+# **How to read this.** This runs on every factor.
+# We expect cell types to be captured well by this approach.
+# Because the output is fluent and self-reported, treat results with caution and always cross-check against the SMI,
+# marker databases, and the literature.
 
 # %% [markdown]
 # ## 3. gs2txt
@@ -585,7 +553,7 @@ embed.var.index.name = None
 # %% [markdown]
 # **How to read this.** Because gs2txt names genes and pathways, its summaries can be traced back to
 # the factor's top-ranked list — a useful gene-level complement to the ORA and TF tools. As with the
-# others, the output is fluent and unscored, so interpret it alongside the rest rather than on its own.
+# others, the output is fluent and unscored, so interpret it with care and alongside the rest rather than on its own.
 
 # %% [markdown]
 # ## 4. Save
