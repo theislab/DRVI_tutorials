@@ -61,7 +61,6 @@ import scvi
 import drvi
 from pathlib import Path
 from drvi.model import DRVI
-from drvi.utils.misc import hvg_batch
 # -
 
 print("Last run with scvi-tools version:", scvi.__version__)
@@ -92,61 +91,22 @@ io_dir.mkdir(parents=True, exist_ok=True)
 io_dir
 # -
 
-# ## Download data
+# ## Download and load data
 
-input_anndata_path = io_dir.parent / "immune_all.h5ad"
-input_anndata_path
+# We use the immune dataset (SCIB, Luecken et al.) hosted on the scverse example data server. The `Villani`
+# batch is already removed because it contains non-count values, and 2000 batch-aware highly variable
+# genes are already selected.
 
-# +
-# Run this cell only if you need to download the data
-import requests
-
-url = f"https://api.figshare.com/v2/file/download/25717328"
-
-if input_anndata_path.exists():
-    print("File already exists.")
-else:
-    print("Downloading ...")
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(input_anndata_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024*1024): f.write(chunk)
-    print(f"Successfully downloaded: {input_anndata_path}")
-# -
-
-# ## Load Data
-
-adata = sc.read_h5ad(input_anndata_path)
-# Remove dataset with non-count values
-adata = adata[adata.obs["batch"] != "Villani"].copy()
-# We shuffle the data for better visualization. Otherwise order of points in UMAP will not be random.
-sc.pp.subsample(adata, fraction=1.)
-adata
-
-# ## Pre-processing
-
-adata.X = adata.layers["counts"].copy()
-sc.pp.normalize_total(adata)
-sc.pp.log1p(adata)
-adata
-
-sc.pp.pca(adata)
-sc.pp.neighbors(adata)
-sc.tl.umap(adata)
-adata
-
-# Batch aware HVG selection (method is obtained from scIB metrics)
-hvg_genes = hvg_batch(adata, batch_key="batch", target_genes=2000, adataOut=False)
-adata = adata[:, hvg_genes].copy()
+input_anndata_path = io_dir.parent / "Immune_HVG_human.h5ad"
+adata = sc.read(
+    input_anndata_path,
+    backup_url="https://exampledata.scverse.org/scvi-tools/Immune_HVG_human.h5ad",
+)
 adata
 
 
 sc.pl.umap(adata, color=["batch", "final_annotation"], ncols=1, frameon=False)
 
-
-# Save pre-processed data for next notebooks
-if overwrite or not (io_dir / "adata_preprocesses.h5ad").exists():
-    adata.write_h5ad(io_dir / "adata_preprocesses.h5ad")
 
 # ## Train DRVI
 

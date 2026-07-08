@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.3
+#       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: drvi_tutorials
 #     language: python
@@ -104,16 +104,18 @@ plt.rcParams["figure.figsize"] = (3, 3)
 # - `drvi_model` — the trained DRVI model.
 # - `embed.h5ad` — the latent space (one column per latent dimension) with dimension stats in `embed.var`
 #   and pre-computed interpretability scores in `embed.varm`.
-# - `adata_preprocesses.h5ad` — the pre-processed counts (2000 HVGs) the model was trained on.
-# - `immune_all.h5ad` — the *full* gene set (used only at the end to validate with the held-out marker).
+# - `Immune_HVG_human.h5ad` — the counts (2000 HVGs) the model was trained on, from the scverse example
+#   data server.
+# - `Immune_ALL_human.h5ad` — the *full* gene set from the scverse example data server (used only at
+#   the end to validate with the held-out marker).
 
 # %%
 io_dir = Path("./tmp_io/drvi_immune_128/")
 
 embed_path = io_dir / "embed.h5ad"
-adata_path = io_dir / "adata_preprocesses.h5ad"
+adata_path = io_dir.parent / "Immune_HVG_human.h5ad"
 model_path = io_dir / "drvi_model"
-full_anndata_path = io_dir.parent / "immune_all.h5ad"
+full_anndata_path = io_dir.parent / "Immune_ALL_human.h5ad"
 
 # Column in `embed.obs` / full data holding the existing cell-type annotation.
 CELL_TYPE_COL = "final_annotation"
@@ -130,7 +132,10 @@ HOST_COVERAGE_CUTOFF = 0.30  # a candidate "needs refinement" if it captures les
 
 # %%
 embed = sc.read_h5ad(embed_path)
-adata = sc.read_h5ad(adata_path)
+adata = sc.read(
+    adata_path,
+    backup_url="https://exampledata.scverse.org/scvi-tools/Immune_HVG_human.h5ad",
+)
 embed
 
 # %%
@@ -458,7 +463,10 @@ drvi.utils.pl.plot_interpretability_scores(interpretability_df, dim_subset=[nove
 
 # %%
 # The full matrix (~2 GB) is only needed here.
-full = sc.read_h5ad(full_anndata_path)
+full = sc.read(
+    full_anndata_path,
+    backup_url="https://exampledata.scverse.org/scvi-tools/Immune_ALL_human.h5ad",
+)
 full = full[embed.obs_names].copy()
 
 assert "COL1A1" not in adata.var_names, "COL1A1 should be held out from the HVGs the model trained on"

@@ -93,31 +93,17 @@ io_dir.mkdir(parents=True, exist_ok=True)
 io_dir
 # -
 
-# ## Download data
+# ## Download and load data
 
-input_anndata_path = io_dir.parent / "immune_all.h5ad"
-input_anndata_path
+# We use the full immune dataset (SCIB, Luecken et al.) hosted on the scverse example data server. It contains
+# all genes and all batches, which we need here to hold out an unseen study as the query and to run batch-aware
+# HVG selection on the reference.
 
-# +
-# Run this cell only if you need to download the data
-import requests
-
-url = f"https://api.figshare.com/v2/file/download/25717328"
-
-if input_anndata_path.exists():
-    print("File already exists.")
-else:
-    print("Downloading ...")
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(input_anndata_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024*1024): f.write(chunk)
-    print(f"Successfully downloaded: {input_anndata_path}")
-# -
-
-# ## Load Data
-
-adata = sc.read_h5ad(input_anndata_path)
+input_anndata_path = io_dir.parent / "Immune_ALL_human.h5ad"
+adata = sc.read(
+    input_anndata_path,
+    backup_url="https://exampledata.scverse.org/scvi-tools/Immune_ALL_human.h5ad",
+)
 # Remove dataset with non-count values
 adata = adata[adata.obs["batch"] != "Villani"].copy()
 # We shuffle the data for better visualization. Otherwise order of points in UMAP will not be random.
@@ -145,10 +131,10 @@ adata_ref, adata_query
 
 
 # Save pre-processed data for next notebooks
-if overwrite or not (io_dir / "adata_preprocesses_ref.h5ad").exists():
-    adata_ref.write_h5ad(io_dir / "adata_preprocesses_ref.h5ad")
-if overwrite or not (io_dir / "adata_preprocesses_query.h5ad").exists():
-    adata_query.write_h5ad(io_dir / "adata_preprocesses_query.h5ad")
+if overwrite or not (io_dir / "adata_preprocessed_ref.h5ad").exists():
+    adata_ref.write_h5ad(io_dir / "adata_preprocessed_ref.h5ad")
+if overwrite or not (io_dir / "adata_preprocessed_query.h5ad").exists():
+    adata_query.write_h5ad(io_dir / "adata_preprocessed_query.h5ad")
 
 del adata
 
