@@ -1,0 +1,26 @@
+# Extra dependencies for the LLM-based factor-identification notebook
+# (identification_of_factors_3_llm_tools). Kept separate from requirements.txt because
+# these are optional and only needed for LLM-based annotation.
+#
+# Install with:  pip install -r requirements_llm.txt
+# (you also need the base requirements.txt installed first)
+#
+# For the "Direct LLM annotation" section you only need the backend(s) you actually use:
+#   - Ollama / OpenAI : openai
+#   - Claude (API)    : anthropic          (needs ANTHROPIC_API_KEY)
+#   - Claude Code     : claude-agent-sdk   (uses your logged-in `claude` CLI; no API key)
+#   - Gemini          : google-genai       (needs GEMINI_API_KEY / GOOGLE_API_KEY)
+# nest-asyncio is only needed to run the Claude Code backend inside Jupyter.
+
+# Direct-LLM backends
+openai==2.44.0
+anthropic==0.116.0
+claude-agent-sdk==0.2.113
+google-genai==2.10.0
+nest-asyncio==1.6.0
+
+# Section 2 — CASSIA (multi-agent annotator)
+CASSIA==1.3.9
+
+# Section 3 — gs2txt (pulls gseapy via the [enrichment] extra; gseapy is already in requirements.txt)
+gs2txt[enrichment]==0.1.2
