@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -32,6 +32,13 @@
 # stored output (including the cell-type and LLM notebooks, if you ran them) into one per-factor
 # view for final labelling.
 #
+# Note: Enrichment usually returns **broad, high-level** processes (e.g. "defense
+# response to virus", "cell cycle"). For a **finer** reading — the specific pathway branch or the
+# program driving a factor — align the factor's top genes with the primary literature, or use the
+# [LLM-based tools](./identification_of_factors_3_llm_tools.html) to *suggest* candidate
+# processes and then verify those suggestions against the literature. LLM output is a hypothesis,
+# not evidence.
+#
 # > This is one of four companion notebooks. See
 # > [cell types from annotations](./identification_of_factors_1_cell_types.html),
 # > [LLM-based tools](./identification_of_factors_3_llm_tools.html), and
@@ -53,8 +60,8 @@
 # [general pipeline](./general_pipeline.html)).
 #
 # **Adapting to your own model** — change `io_dir` (Section 0) and, per tool, the database/organism
-# config: `gseapy_db` (2.1), `organism` + `gp_source` (2.2), `dc_geneset` + `dc_organism` (2.3).
-# See the [appendix](#4.-Appendix:-database-reference) for options.
+# config: `gseapy_db` (Section 1), `organism` + `gp_source` (Section 2), and `dc_geneset` /
+# `dc_organism` (Section 3). See the [appendix](#6.-Appendix:-database-reference) for options.
 
 # %% [markdown]
 # ## Contact
@@ -158,8 +165,15 @@ def top_genes(scores_df, col, cutoff, top_n):
     return s[s >= cutoff].nlargest(top_n).index.astype(str).tolist()
 
 
+def factor_first(df):
+    """Return `df` with the `factor` column moved to the front (no-op if empty/absent)."""
+    if df.empty or "factor" not in df.columns:
+        return df
+    return df[["factor", *df.columns.drop("factor")]]
+
+
 # %% [markdown]
-# ## 2.1 Enrichr (via GSEApy)
+# ## 1. Enrichr (via GSEApy)
 #
 # [GSEApy](https://github.com/zqfang/GSEApy)'s Enrichr ORA tests whether a factor's top-N gene
 # list is enriched for terms in a chosen library, against a gene background.
@@ -195,13 +209,17 @@ def run_gseapy_enrichr(scores_df, gene_sets, cutoff, top_n, padj_cutoff, backgro
             continue
         hits = enr.results[enr.results["Adjusted P-value"] < padj_cutoff].sort_values("Adjusted P-value")
         rows.append(hits.assign(factor=col))
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+    return factor_first(pd.concat(rows, ignore_index=True)) if rows else pd.DataFrame()
 
 
 gseapy_enrichr_results = run_gseapy_enrichr(
     scores_df, gseapy_db, gseapy_cutoff, gseapy_top_n, padj_threshold, gene_background
 )
 display(gseapy_enrichr_results.head())
+
+# %%
+# Let's look at the top enriched term for each factor-direction.
+display(gseapy_enrichr_results.drop_duplicates(subset=["factor"], keep="first"))
 
 # %% [markdown]
 # ### Store results
@@ -221,13 +239,11 @@ print(f"Enrichr significant factor-directions: {n_sig} / {scores_df.shape[1]}")
 # alongside g:Profiler below — convergent terms across the two ORA tools are better supported.
 
 # %% [markdown]
-# ## 2.2 g:Profiler
+# ## 2. g:Profiler
 #
 # [g:Profiler](https://biit.cs.ut.ee/gprofiler/) runs ORA with g:SCS multiple-testing correction,
 # designed for hierarchical GO terms. In **ordered-query** mode it walks the ranked gene list to
 # find the best-enriched prefix, which suits continuous factor scores better than a fixed top-N.
-# Treat its output as a **shortlist** rather than a single label — broad umbrella terms recur
-# across factors while specific child terms capture finer biology.
 
 # %%
 from gprofiler import GProfiler
@@ -259,7 +275,7 @@ def run_gprofiler(scores_df, background, organism, sources, pval_threshold, cuto
         if res is None or res.empty:
             continue
         rows.append(res.assign(factor=col))
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+    return factor_first(pd.concat(rows, ignore_index=True)) if rows else pd.DataFrame()
 
 
 gprofiler_results = run_gprofiler(
@@ -272,6 +288,11 @@ if not gprofiler_results.empty:
 n_sig = gprofiler_results["factor"].nunique() if not gprofiler_results.empty else 0
 print(f"g:Profiler significant factor-directions: {n_sig} / {scores_df.shape[1]}")
 gprofiler_results.sort_values(["factor", "p_value"]).head() if not gprofiler_results.empty else gprofiler_results
+
+# %%
+# Let's look at the top enriched term for each factor-direction.
+if not gprofiler_results.empty:
+    display(gprofiler_results.drop_duplicates(subset=["factor"], keep="first"))
 
 # %% [markdown]
 # ### Store results
@@ -288,7 +309,7 @@ embed.uns["gprofiler_results"] = gprofiler_results.convert_dtypes(
 # read the two together and trust convergent calls more than single-tool ones.
 
 # %% [markdown]
-# ## 2.3 decoupler
+# ## 3. decoupler
 #
 # [decoupler](https://decoupler-py.readthedocs.io/) infers the **activity of regulators** from
 # gene-level scores against a prior-knowledge network, rather than testing gene-set overlap.
@@ -299,9 +320,6 @@ embed.uns["gprofiler_results"] = gprofiler_results.convert_dtypes(
 # - **CollecTRI** — comprehensive TF → target regulons (recommended for TF drivers).
 # - **DoRothEA** — TF regulons with confidence tiers A–D (tunable stringency).
 # - **PROGENy** — pathway footprints (Hypoxia, EGFR, TGFb, ...); exploratory for signaling.
-#
-# CollecTRI and DoRothEA are usually most informative for latent factors. Multiple methods are
-# run and combined via consensus for robust p-values.
 
 # %%
 import decoupler as dc
@@ -393,7 +411,33 @@ embed.uns["decoupler_results"] = decoupler_results.convert_dtypes(
 # treat regulators as candidate drivers to cross-check, not conclusions.
 
 # %% [markdown]
-# ## 3. Save
+# ## 4. Manual Exploration
+#
+# Not every factor is a cell type. Some capture a process shared across many different cell types.
+# DR 43− is a good example: an **antiviral / interferon response**. Its top genes are canonical
+# interferon-stimulated genes (IFIT1/2/3, ISG15, MX1, CXCL10); all three tools converge on
+# virus/interferon terms and point to the interferon regulator IRF9.
+
+# %%
+process_factor = "DR 43-"   # a program shared across cell types (edit to explore another factor)
+
+
+def show_factor_evidence(factor_label, cutoff=0.1, n_genes=12):
+    genes = top_genes(scores_df, factor_label, cutoff, n_genes)
+    print(f"{factor_label} — top genes:\n  {', '.join(genes)}\n")
+    for name, df, col in [
+        ("Enrichr", gseapy_enrichr_results, "Term"),
+        ("g:Profiler", gprofiler_results, "name"),
+        ("decoupler TF", decoupler_results, "term"),
+    ]:
+        terms = df.loc[df["factor"] == factor_label, col].head(5).tolist() if not df.empty else []
+        print(f"{name}: {terms or '(no hit)'}")
+
+
+show_factor_evidence(process_factor)
+
+# %% [markdown]
+# ## 5. Save
 #
 # Persist the enrichment results so the curation view (and the other notebooks) can read them.
 
@@ -403,10 +447,19 @@ embed.write_h5ad(embed_path)
 print(f"Updated embedding saved to: {embed_path}")
 
 # %% [markdown]
-# ## 4. Appendix: database reference
+# ## 6. Appendix: database reference
 #
 # Swap the tool-specific config variables above (`gseapy_db`, `gp_source`, `dc_geneset`) to use
-# different databases.
+# different databases. The small tables below list common choices.
+#
+# For a much larger, curated catalog, this repo bundles
+# [`resources/gene_set_libraries_master_v0_8_FINAL.xlsx`](./resources/gene_set_libraries_master_v0_8_FINAL.xlsx)
+# — a registry of gene-set libraries with, per library, its authoritative source, license,
+# curation-quality rating, and flags for which tool can consume it
+# (`usable_in_gseapy` / `usable_in_gprofiler` / `usable_in_decoupler`). It also includes
+# recommended panels for this exact workflow (e.g. `Core_Biology_DRVI`, `Cell_Type_Annotation`,
+# `Regulatory_Activity`). Load it with `pd.read_excel(..., sheet_name="libraries_master")` and
+# filter to the tool you are using.
 #
 # ### Biological process databases
 #
