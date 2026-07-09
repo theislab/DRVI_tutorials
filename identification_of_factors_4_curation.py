@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.3
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: drvi_tutorials
 #     language: python
 #     name: python3
 # ---
@@ -17,18 +17,10 @@
 # # Curating DRVI factor annotations
 #
 # The integrative step: for each factor-direction, compare **all** tools' outputs and assign a
-# final label. Each tool contributes a different kind of evidence and none is sufficient alone.
+# final label.
 #
-# This notebook is **standalone** — it reloads `embed` from disk and reads whatever the other
-# notebooks stored in `embed.uns` / `embed.var`. Tools whose notebook you did not run simply show
-# "(not run)". A practical sequence:
-#
-# 1. **Cell-type identity** — SMI (user annotations, then CellTypist) from the
-#    [cell-types notebook](./identification_of_factors_1_cell_types.html); LLM tools as coarse
-#    orientation when SMI is empty.
-# 2. **Process** — g:Profiler + Enrichr together; convergent terms strengthen a call.
-# 3. **Regulators** — where decoupler reports a TF, check consistency with the above.
-# 4. **Literature** — none of these is formal validation; confirm before finalizing a label.
+# This notebook reloads `embed` from disk and reads whatever the other notebooks stored in 
+# `embed.uns` / `embed.var`. Tools whose notebook you did not run simply show "(not run)".
 #
 # For each factor: `inspect(...)` prints all evidence, `plot_factor_summary(...)` shows its UMAP
 # pattern and top genes, `inspect_marker_gene(...)` tests a specific gene. Record decisions in
@@ -188,14 +180,15 @@ def plot_factor_summary(factor_label, embed, adata, scores_df, annot_col="final_
 def inspect_marker_gene(gene, embed, adata, scores_df=scores_df, top_n=10):
     adata.obsm["X_drvi_umap"] = embed[adata.obs.index].obsm["X_umap"]
     sc.pl.embedding(adata, "X_drvi_umap", color=gene, cmap="viridis")
-    return scores_df.loc[gene].sort_values(ascending=False).head(top_n)
+    print(f"Top {top_n} factors for gene '{gene}':")
+    print(scores_df.loc[gene].sort_values(ascending=False).head(top_n))
 
 
 # %% [markdown]
 # ## Go factor by factor
 
 # %%
-factor_label = "DR 38+"
+factor_label = "DR 43-"
 inspect(factor_label, embed)
 plot_factor_summary(factor_label, embed, adata, scores_df)
 
@@ -203,7 +196,7 @@ plot_factor_summary(factor_label, embed, adata, scores_df)
 # ### Inspect a marker gene
 
 # %%
-marker_gene = "CD4"
+marker_gene = "ISG15"
 inspect_marker_gene(marker_gene, embed, adata)
 
 # %% [markdown]
@@ -211,7 +204,7 @@ inspect_marker_gene(marker_gene, embed, adata)
 
 # %%
 MANUAL_LABELS = {
-    # "DR 5+": "CD8 T cell effector",
+    "DR 43-": "Interferon response",
 }
 
 # %% [markdown]
