@@ -45,23 +45,28 @@
 # %% [markdown]
 # ## Install
 #
-# If you try DRVI on colab, the next cell will install dependencies.
+# This notebook uses the **`tutorials`** extra of `drvi-py` (DRVI plus helper packages such as
+# leidenalg, used here for Leiden clustering). Install it once in your environment with:
 #
-# Please remove this part if your environment is already setup.
+# ```bash
+# pip install "drvi-py[tutorials]"
+# ```
+#
+# On Colab, the next cell does this for you. Remove it if your environment is already set up.
 
 # %%
 import sys
+import subprocess
 
 # if branch is stable, will install via pypi, else will install from source
 branch = "latest"
 IN_COLAB = "google.colab" in sys.modules
 
 if IN_COLAB and branch == "stable":
-    # !pip install drvi-py[tutorials]
-    pass
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials]"])
 elif IN_COLAB and branch != "stable":
-    # !pip install git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]
-    pass
+    subprocess.check_call([sys.executable, "-m", "pip", "install",
+                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]"])
 
 # %% [markdown]
 # ## Imports

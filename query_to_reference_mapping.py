@@ -1,11 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py:light
+#     formats: ipynb,py:percent
 #     text_representation:
 #       extension: .py
-#       format_name: light
-#       format_version: '1.5'
+#       format_name: percent
+#       format_version: '1.3'
 #       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: python_apptainer
@@ -13,8 +13,10 @@
 #     name: python_apptainer
 # ---
 
+# %% [markdown]
 # # Transfer learning to new dataset (query to reference mapping)
 
+# %% [markdown]
 # In this notebook, we train a DRVI model on reference data and transfer processes and embeddings to query data. DRVI uses the scArches approach internally. This covers:
 #
 # - Training DRVI
@@ -24,37 +26,49 @@
 #
 # **IMPORTANT:** Set `encode_covariates=True` when initializing the model (not default). This ensures the model uses batch information in the encoder, which is essential for query to reference mapping.
 
+# %% [markdown]
 # ## Contact
 
+# %% [markdown]
 # For questions and help requests, you can reach out in the [scverse discourse](https://discourse.scverse.org/).
 #
 # If you found a bug, please use the [issue tracker](https://github.com/theislab/drvi/issues).
 
+# %% [markdown]
 # ## Install
 
-# If you try DRVI on colab, next cell will install dependencies.
+# %% [markdown]
+# This notebook uses the **`tutorials`** extra of `drvi-py` (DRVI plus helper packages such as
+# leidenalg). Install it once in your environment with:
 #
-# Please remove this part if your environment is already setup.
+# ```bash
+# pip install "drvi-py[tutorials]"
+# ```
+#
+# On Colab, the next cell does this for you. Remove it if your environment is already set up.
 
-# +
+# %%
 import sys
+import subprocess
 
 # if branch is stable, will install via pypi, else will install from source
 branch = "latest"
 IN_COLAB = "google.colab" in sys.modules
 
 if IN_COLAB and branch == "stable":
-    # !pip install drvi-py[tutorials]
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials]"])
 elif IN_COLAB and branch != "stable":
-    # !pip install git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]
-# -
+    subprocess.check_call([sys.executable, "-m", "pip", "install",
+                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]"])
 
+# %% [markdown]
 # ## Imports
 
+# %%
 import warnings
 warnings.filterwarnings("ignore")
 
-# +
+# %%
 import anndata as ad
 import scanpy as sc
 
@@ -63,12 +77,12 @@ import drvi
 from pathlib import Path
 from drvi.model import DRVI
 from drvi.utils.misc import hvg_batch
-# -
 
+# %%
 print("Last run with scvi-tools version:", scvi.__version__)
 print("Last run with DRVI version:", drvi.__version__)
 
-# +
+# %%
 # Making plots prettier
 sc.settings.set_figure_params(dpi=100, frameon=False)
 sc.set_figure_params(dpi=100)
@@ -77,11 +91,11 @@ sc.set_figure_params(figsize=(3, 3))
 from matplotlib import pyplot as plt
 plt.rcParams["figure.dpi"] = 100
 plt.rcParams["figure.figsize"] = (3, 3)
-# -
 
+# %% [markdown]
 # ## Config
 
-# +
+# %%
 # Set this to false if you already trained your model and do not want to retrain.
 overwrite = False
 SEED = 1  # Set to None if you don't want to set seed
@@ -91,14 +105,16 @@ SEED = 1  # Set to None if you don't want to set seed
 io_dir = Path("./tmp_io/drvi_immune_128_q2r/")
 io_dir.mkdir(parents=True, exist_ok=True)
 io_dir
-# -
 
+# %% [markdown]
 # ## Download and load data
 
+# %% [markdown]
 # We use the full immune dataset (SCIB, Luecken et al.) hosted on the scverse example data server. It contains
 # all genes and all batches, which we need here to hold out an unseen study as the query and to run batch-aware
 # HVG selection on the reference.
 
+# %%
 input_anndata_path = io_dir.parent / "Immune_ALL_human.h5ad"
 adata = sc.read(
     input_anndata_path,
@@ -110,19 +126,24 @@ adata = adata[adata.obs["batch"] != "Villani"].copy()
 sc.pp.subsample(adata, fraction=1.)
 adata
 
+# %% [markdown]
 # ## Pre-processing
 
+# %%
 adata.X = adata.layers["counts"].copy()
 sc.pp.normalize_total(adata)
 sc.pp.log1p(adata)
 adata
 
+# %%
 adata.obs['study'].unique()
 
+# %%
 # Holding out an unseen dataset as query
 adata_ref = adata[adata.obs['study'] != 'Sun'].copy()
 adata_query = adata[adata.obs['study'] == 'Sun'].copy()
 
+# %%
 # Batch aware HVG selection (method is obtained from scIB metrics)
 hvg_genes = hvg_batch(adata_ref, batch_key="batch", target_genes=2000, adataOut=False)
 adata_ref = adata_ref[:, hvg_genes].copy()
@@ -130,17 +151,20 @@ adata_query = adata_query[:, hvg_genes].copy()
 adata_ref, adata_query
 
 
+# %%
 # Save pre-processed data for next notebooks
 if overwrite or not (io_dir / "adata_preprocessed_ref.h5ad").exists():
     adata_ref.write_h5ad(io_dir / "adata_preprocessed_ref.h5ad")
 if overwrite or not (io_dir / "adata_preprocessed_query.h5ad").exists():
     adata_query.write_h5ad(io_dir / "adata_preprocessed_query.h5ad")
 
+# %%
 del adata
 
+# %% [markdown]
 # ## Train DRVI
 
-# +
+# %%
 # You can also skip this cell if model is already trained
 # For more details on training params please refer to the general pipeline notebook
 
@@ -167,7 +191,7 @@ model = DRVI(
 )
 model
 
-# +
+# %%
 n_epochs = 400
 model_path = io_dir / "drvi_model"
 
@@ -185,27 +209,31 @@ if overwrite or not model_path.exists():
     
     # Save the model
     model.save(model_path, overwrite=True)
-# -
+# %%
 
 
-
+# %% [markdown]
 # ## Get reference embeddings
 
+# %%
 # Load the model
 model = DRVI.load(model_path, adata_ref)
 model
 
+# %%
 embed_ref = ad.AnnData(model.get_latent_representation(adata_ref), obs=adata_ref.obs)
 model.set_latent_dimension_stats(embed_ref, vanished_threshold=0.5)
 embed_ref.write_h5ad(io_dir / "embed_ref.h5ad")
 
+# %% [markdown]
 # If you are interested to observe your latent space and latent factors of the reference model, please have a look at the main tutorial.
 
+# %%
 
-
+# %% [markdown]
 # ## Transfer learning
 
-# +
+# %%
 model_path = io_dir / "drvi_model_transfer"
 if overwrite or not model_path.exists():
     drvi.model.DRVI.prepare_query_anndata(adata_query, model)
@@ -221,13 +249,13 @@ if overwrite or not model_path.exists():
     model_transfer.save(model_path, overwrite=True)
 
 model_transfer = DRVI.load(model_path, adata_query)
-# -
+# %%
 
 
-
+# %% [markdown]
 # ## Latent space
 
-# +
+# %%
 embed_path = io_dir / "embed.h5ad"
 
 # Create latent space data in anndata format
@@ -247,40 +275,52 @@ if overwrite or not embed_path.exists():
     
     embed.write_h5ad(embed_path)
 embed
-# -
 
+# %%
 embed = sc.read_h5ad(embed_path)
 
+# %%
 sc.pl.umap(embed, color=["batch", "split", "final_annotation"], ncols=1, frameon=False)
 
 
+# %%
 sc.pl.umap(embed, mask_obs=embed.obs['split']=='query', color=["final_annotation"], ncols=1, frameon=False)
 
+# %% [markdown]
 # ### Plot latent dimensions
 
+# %% [markdown]
 # By default, vanished dimensions are not plotted. Change arguments if you would like to.
 
+# %% [markdown]
 # #### UMAP of factors for all cells
 
+# %%
 drvi.utils.pl.plot_latent_dims_in_umap(embed)
 
+# %% [markdown]
 # #### UMAP of factors for query cells
 
+# %%
 drvi.utils.pl.plot_latent_dims_in_umap(
     embed,
     mask_obs=embed.obs['split']=='query',
 )
 
+# %% [markdown]
 # #### Heatmaps
 
+# %%
 drvi.utils.pl.plot_latent_dims_in_heatmap(embed_ref, "final_annotation", title_col="title")
 
+# %%
 embed_query.var = embed_ref.var.copy()
 drvi.utils.pl.plot_latent_dims_in_heatmap(embed_query, "final_annotation", title_col="title")
 
+# %%
 
-
+# %% [markdown]
 # ## Notes
 # For more details such as interpretability of latent factors please refer to other tutorials. 
 
-
+# %%

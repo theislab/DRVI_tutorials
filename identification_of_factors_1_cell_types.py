@@ -66,7 +66,14 @@
 # %% [markdown]
 # ## Install
 #
-# On Colab, the next cell installs the dependencies. Remove it if your environment is ready.
+# This notebook uses the **`tutorials-cell-types`** extra of `drvi-py`, which adds CellTypist and
+# networkx on top of DRVI. Install it once in your environment with:
+#
+# ```bash
+# pip install "drvi-py[tutorials-cell-types]"
+# ```
+#
+# On Colab, the next cell does this for you. Remove it if your environment is already set up.
 
 # %%
 import sys
@@ -76,13 +83,10 @@ branch = "latest"
 IN_COLAB = "google.colab" in sys.modules
 
 if IN_COLAB and branch == "stable":
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials]"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials-cell-types]"])
 elif IN_COLAB and branch != "stable":
     subprocess.check_call([sys.executable, "-m", "pip", "install",
-                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]"])
-
-if IN_COLAB:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "celltypist"])
+                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials-cell-types]"])
 
 # %% [markdown]
 # ## Imports

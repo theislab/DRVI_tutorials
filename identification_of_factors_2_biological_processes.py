@@ -72,7 +72,15 @@
 # %% [markdown]
 # ## Install
 #
-# On Colab, the next cell installs the dependencies. Remove it if your environment is ready.
+# This notebook uses the **`tutorials-biological-processes`** extra of `drvi-py`, which adds
+# GSEApy, g:Profiler, decoupler, and statsmodels on top of DRVI. Install it once in your
+# environment with:
+#
+# ```bash
+# pip install "drvi-py[tutorials-biological-processes]"
+# ```
+#
+# On Colab, the next cell does this for you. Remove it if your environment is already set up.
 
 # %%
 import sys
@@ -82,14 +90,10 @@ branch = "latest"
 IN_COLAB = "google.colab" in sys.modules
 
 if IN_COLAB and branch == "stable":
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials]"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials-biological-processes]"])
 elif IN_COLAB and branch != "stable":
     subprocess.check_call([sys.executable, "-m", "pip", "install",
-                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]"])
-
-if IN_COLAB:
-    subprocess.check_call([sys.executable, "-m", "pip", "install",
-                           "gseapy", "gprofiler-official", "decoupler"])
+                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials-biological-processes]"])
 
 # %% [markdown]
 # ## Imports

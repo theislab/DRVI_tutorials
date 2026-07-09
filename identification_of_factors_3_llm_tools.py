@@ -39,7 +39,8 @@
 # > be confidently wrong, so always cross-check it against the SMI and enrichment tools and against
 # > the literature.
 #
-# Install the packages for your chosen backend via the install cell below.
+# Install the backends and tools via the install cell below (all bundled in the `drvi-py`
+# `tutorials-llm` extra).
 
 # %% [markdown]
 # ## Prerequisites
@@ -59,7 +60,16 @@
 # %% [markdown]
 # ## Install
 #
-# Install only what your chosen backend needs (none of these are in `requirements.txt`):
+# Every optional tool this notebook can use is bundled in the **`tutorials-llm`** extra of
+# `drvi-py`. To install all of them at once:
+#
+# ```bash
+# pip install "drvi-py[tutorials-llm]"
+# ```
+#
+# That pulls in every backend SDK (`openai`, `anthropic`, `claude-agent-sdk`, `google-genai`),
+# plus `nest-asyncio`, `cassia` (Section 2), and `gs2txt[enrichment]` (Section 3). If you only
+# need a single backend, install just what it requires instead:
 #
 # - **Ollama** or **OpenAI**: `pip install openai`
 # - **Claude API**: `pip install anthropic`
@@ -67,19 +77,22 @@
 #   also needs the `claude` CLI installed and logged in (`claude login`), and in Jupyter
 #   `pip install nest-asyncio`.
 # - **Gemini**: `pip install google-genai`
-# - **CASSIA** (Section 2): `pip install CASSIA`
+# - **CASSIA** (Section 2): `pip install cassia`
 # - **gs2txt** (Section 3): `pip install "gs2txt[enrichment]"`
 
 # %%
 import sys
 import subprocess
 
-# Uncomment the line(s) for the backend/tools you want to use:
+# Everything at once (all backends + CASSIA + gs2txt):
+# subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials-llm]"])
+
+# ...or uncomment only the line(s) for the backend/tools you want to use:
 # subprocess.check_call([sys.executable, "-m", "pip", "install", "openai"])            # Ollama / OpenAI
 # subprocess.check_call([sys.executable, "-m", "pip", "install", "anthropic"])         # Claude API
 # subprocess.check_call([sys.executable, "-m", "pip", "install", "claude-agent-sdk", "nest-asyncio"])  # Claude Code
 # subprocess.check_call([sys.executable, "-m", "pip", "install", "google-genai"])      # Gemini
-# subprocess.check_call([sys.executable, "-m", "pip", "install", "CASSIA"])            # Section 2
+# subprocess.check_call([sys.executable, "-m", "pip", "install", "cassia"])            # Section 2
 # subprocess.check_call([sys.executable, "-m", "pip", "install", "gs2txt[enrichment]"])  # Section 3
 
 # %% [markdown]

@@ -1,11 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py:light
+#     formats: ipynb,py:percent
 #     text_representation:
 #       extension: .py
-#       format_name: light
-#       format_version: '1.5'
+#       format_name: percent
+#       format_version: '1.3'
 #       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: python_apptainer
@@ -13,8 +13,10 @@
 #     name: python_apptainer
 # ---
 
+# %% [markdown]
 # # General training and interpretability pipeline
 
+# %% [markdown]
 # In this notebook, we analyze the immune dataset of 9 batches from four human peripheral blood and bone marrow studies, with 16 annotated cell types. We apply DRVI with 128 latent dimensions to showcase the following:
 #
 # - How to train DRVI
@@ -23,37 +25,49 @@
 # - How to run the interpretability pipeline
 # - How to identify and check individual dimensions
 
+# %% [markdown]
 # ## Contact
 
+# %% [markdown]
 # For questions and help requests, you can reach out in the [scverse discourse](https://discourse.scverse.org/).
 #
 # If you found a bug, please use the [issue tracker](https://github.com/theislab/drvi/issues).
 
+# %% [markdown]
 # ## Install
 
-# If you try DRVI on colab, next cell will install dependencies.
+# %% [markdown]
+# This notebook uses the **`tutorials`** extra of `drvi-py` (DRVI plus helper packages such as
+# leidenalg). Install it once in your environment with:
 #
-# Please remove this part if your environment is already setup.
+# ```bash
+# pip install "drvi-py[tutorials]"
+# ```
+#
+# On Colab, the next cell does this for you. Remove it if your environment is already set up.
 
-# +
+# %%
 import sys
+import subprocess
 
 # if branch is stable, will install via pypi, else will install from source
 branch = "latest"
 IN_COLAB = "google.colab" in sys.modules
 
 if IN_COLAB and branch == "stable":
-    # !pip install drvi-py[tutorials]
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "drvi-py[tutorials]"])
 elif IN_COLAB and branch != "stable":
-    # !pip install git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]
-# -
+    subprocess.check_call([sys.executable, "-m", "pip", "install",
+                           "git+https://github.com/theislab/drvi.git#egg=drvi-py[tutorials]"])
 
+# %% [markdown]
 # ## Imports
 
+# %%
 import warnings
 warnings.filterwarnings("ignore")
 
-# +
+# %%
 import anndata as ad
 import scanpy as sc
 
@@ -61,12 +75,12 @@ import scvi
 import drvi
 from pathlib import Path
 from drvi.model import DRVI
-# -
 
+# %%
 print("Last run with scvi-tools version:", scvi.__version__)
 print("Last run with DRVI version:", drvi.__version__)
 
-# +
+# %%
 # Making plots prettier
 sc.settings.set_figure_params(dpi=100, frameon=False)
 sc.set_figure_params(dpi=100)
@@ -75,11 +89,11 @@ sc.set_figure_params(figsize=(3, 3))
 from matplotlib import pyplot as plt
 plt.rcParams["figure.dpi"] = 100
 plt.rcParams["figure.figsize"] = (3, 3)
-# -
 
+# %% [markdown]
 # ## Config
 
-# +
+# %%
 # Set this to false if you already trained your model and do not want to retrain.
 overwrite = False
 SEED = 1  # Set to None if you don't want to set seed
@@ -89,14 +103,16 @@ SEED = 1  # Set to None if you don't want to set seed
 io_dir = Path("./tmp_io/drvi_immune_128/")
 io_dir.mkdir(parents=True, exist_ok=True)
 io_dir
-# -
 
+# %% [markdown]
 # ## Download and load data
 
+# %% [markdown]
 # We use the immune dataset (SCIB, Luecken et al.) hosted on the scverse example data server. The `Villani`
 # batch is already removed because it contains non-count values, and 2000 batch-aware highly variable
 # genes are already selected.
 
+# %%
 input_anndata_path = io_dir.parent / "Immune_HVG_human.h5ad"
 adata = sc.read(
     input_anndata_path,
@@ -105,12 +121,14 @@ adata = sc.read(
 adata
 
 
+# %%
 sc.pl.umap(adata, color=["batch", "final_annotation"], ncols=1, frameon=False)
 
 
+# %% [markdown]
 # ## Train DRVI
 
-# +
+# %%
 # You can also skip this cell if model is already trained
 
 # Setup data
@@ -142,7 +160,7 @@ model = DRVI(
 )
 model
 
-# +
+# %%
 # For cpu training you should add the following line to the model.train parameters:
 # accelerator="cpu", devices=1,
 #
@@ -180,15 +198,16 @@ if overwrite or not model_path.exists():
 # The runtime for CPU laptop (M1) is 208 minutes
 # The runtime for Macbook gpu (M1) is 64 minutes
 # The runtime for GPU (H100) is 10 minutes
-# -
 
+# %% [markdown]
 # ## Latent space
 
+# %%
 # Load the model
 model = DRVI.load(model_path, adata)
 model
 
-# +
+# %%
 embed_path = io_dir / "embed.h5ad"
 
 # Create latent space data in anndata format
@@ -213,69 +232,93 @@ if overwrite or not embed_path.exists():
 
     print("Writing ...")
     embed.write_h5ad(embed_path)
-# -
 
+# %%
 embed = sc.read_h5ad(embed_path)
 
+# %%
 sc.pl.umap(embed, color=["batch", "final_annotation"], ncols=1, frameon=False)
 
 
+# %% [markdown]
 # ### Check latent dimension stats
 
+# %%
 # Show information for latent factors
 embed.var.sort_values("reconstruction_effect", ascending=False)[:5]
 
+# %%
 drvi.utils.pl.plot_latent_dimension_stats(embed, ncols=2)
 
 
+# %% [markdown]
 # You can check the same plot after removing vanished dimensions
 
+# %%
 drvi.utils.pl.plot_latent_dimension_stats(embed, ncols=2, remove_vanished=True)
 
 
+# %% [markdown]
 # ### Plot latent dimensions
 
+# %% [markdown]
 # By default, vanished dimensions are not plotted. Change arguments if you would like to.
 
+# %% [markdown]
 # #### UMAP
 
+# %%
 drvi.utils.pl.plot_latent_dims_in_umap(embed)
 
+# %% [markdown]
 # #### Heatmap
 
+# %% [markdown]
 # Heatmaps can be useful to visualize general relationship between latent dims and known categories of data
 
+# %%
 drvi.utils.pl.plot_latent_dims_in_heatmap(embed, "final_annotation", title_col="title")
 
+# %% [markdown]
 # It is possible to sort dimensions based on the top relevance with respect to a categorical variable
 
+# %%
 drvi.utils.pl.plot_latent_dims_in_heatmap(embed, "final_annotation", title_col="title", sort_by_categorical=True)
 
 
+# %% [markdown]
 # ## Interpretability
 
+# %% [markdown]
 #  The scores are already calculated and stored in embed.varm.
 
+# %%
 embed.varm
 
+# %% [markdown]
 # ### Out-Of-Distribution (OOD) scores
 #
 # This approach iterates over latent dimensions and calculates decoder effects.
 
+# %% [markdown]
 # We first visualize gene scores based on default algorithm (optionally you can pass `key="OOD_combined"`)
 #
 # These scores show a combination of max effect and specificity. So, this is our suggested method to consider for finding cell-types and most specific genes of a program.
 #
 # If human readable gene symbols are present in a different column of adata other than adata.var.index, please pass that column as `gene_symbols=...` to the function.
 
+# %%
 model.plot_interpretability_scores(embed, adata)
 
+# %% [markdown]
 # You can get all scores as a dataframe:
 
+# %%
 # Note: Genes (rows of the dataframe) appear as in adata and are not sorted.
 scores_df = model.get_interpretability_scores(embed, adata)
 scores_df.iloc[:10, :10]
 
+# %% [markdown]
 # A user can take a deeper look into individual dimensions. By visualizing the min_possible, and max_possible log-fold-changes of each dimension in OOD settings. Please refer to paper appendix for details on these scores that together form OOD_combined.
 #
 # ```
@@ -289,10 +332,11 @@ scores_df.iloc[:10, :10]
 # model.plot_interpretability_scores(embed, adata, key="OOD_min_possible")
 # ```
 
+# %% [markdown]
 # ---
 # Users can plot top relevant genes of a factor on UMAP using scanpy plotting functions:
 
-# +
+# %%
 # DR 11- shows CD8+ cells and DR 27+ shows T-reg (May vary depending on the system and initialization)
 
 # We first copy UMAP embeddings to original anndata
@@ -304,24 +348,30 @@ for dim_title in ['DR 11-', 'DR 27+']:
     top_genes = scores_df[dim_title].sort_values(ascending=False).index.to_list()[:4]
     drvi.utils.pl.plot_latent_dims_in_umap(embed, dim_subset=[dim_title], directional=True)
     sc.pl.embedding(adata, "X_drvi_umap", color=top_genes)
-# -
 
+# %% [markdown]
 # ### Within-Distribution (IND) scores
 #
 # This approach iterates over all cells in anndata and averages the effect of each latent factor on each gene. The scores are already stored in embed.
 
+# %% [markdown]
 # These scores reflect the broad mechanistic effect of each latent dimension. Because genes are not filtered for uniqueness, shared genes retain high scores, providing a complete view of how each factor influences the genetic landscape.
 
+# %%
 model.plot_interpretability_scores(embed, adata, key="IND_linear_weighted_mean")
 
+# %% [markdown]
 # You can get all scores as a dataframe:
 
+# %%
 # Note: Genes (rows of the dataframe) appear as in adata and are not sorted.
 scores_df = model.get_interpretability_scores(embed, adata, key="IND_linear_weighted_mean")
 scores_df.iloc[:10, :10]
 
+# %% [markdown]
 # ## Identification of programs
 
+# %% [markdown]
 # Once we identify the top relevant genes, we can determine some programs through supervised external information, such as:
 # - existing annotations
 # - examination by biologists
@@ -333,6 +383,6 @@ scores_df.iloc[:10, :10]
 #
 # It is worth mentioning that since such supervised information is not given to the model, the quality of the derived signatures is neither affected nor biased by it. Unidentified processes with high gene scores are promising candidates for further literature search, additional analysis, and even experimental design.
 
+# %%
 
-
-
+# %%

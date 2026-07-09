@@ -42,8 +42,8 @@
 # ## Prerequisites
 #
 # Run one or more of the companion notebooks first so that `embed.h5ad` contains their stored
-# results. This notebook needs only the base dependencies (`drvi`, `scanpy`) from
-# `requirements.txt` — no LLM or enrichment packages.
+# results. This notebook needs only the base `drvi-py` package (`pip install drvi-py`, which
+# provides `drvi` and `scanpy`) — none of the tutorial extras (LLM or enrichment) are required.
 
 # %% [markdown]
 # ## Imports
