@@ -442,8 +442,8 @@ def run_cassia_annotation(scores_df, tissue, cutoff, top_n, output_name, provide
     )
 
     results = pd.read_csv(f"{output_name}_summary.csv")
-    results["factor"] = results["Cluster ID"].str[:-1].str.replace("_", " ")
-    results["direction"] = results["Cluster ID"].str[-1]
+    results.insert(0, "factor", results["Cluster ID"].str[:-1].str.replace("_", " "))
+    results.insert(1, "direction", results["Cluster ID"].str[-1])
 
     for p in Path(".").glob(f"{output_name}*"):
         p.unlink()
@@ -455,7 +455,7 @@ cassia_results = run_cassia_annotation(
     output_name=cassia_output_name, provider=cassia_provider, model=cassia_model, species=llm_species,
     max_dirs=max_directions,
 )
-cassia_results.head()
+display(cassia_results)
 
 # %% [markdown]
 # ### Store results
